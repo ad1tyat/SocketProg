@@ -7,6 +7,8 @@
 #include <netinet/in.h>
 #include <netdb.h> 
 
+#include "message.h"
+
 void error(const char *msg)
 {
     perror(msg);
