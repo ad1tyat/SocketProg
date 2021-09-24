@@ -18,7 +18,7 @@ void error(const char *msg) {
 #define MAXN 1005
 
 int PRICE[MAXN];
-char *desc[MAXN];
+char desc[MAXN][55];
 
 void populate() {
     FILE *databasePtr;
@@ -31,12 +31,12 @@ void populate() {
     char prodDesc[50];
     for(int i = 0;i<1000;i++){
         PRICE[i] = -1;
-        desc[i] = "UPC CODE NOT DEFINED";
+        strcpy(desc[i], "UPC CODE NOT DEFINED");
     }
     while(fscanf(databasePtr, "%d %d %s\n",&upc, &x, prodDesc) > 0){
         PRICE[upc] = x;
-        desc[upc] = prodDesc;
-        printf("%d %d %s", upc, x, prodDesc);
+        strcpy(desc[upc], prodDesc);
+        printf("%d %d %s\n", upc, x, prodDesc);
     }
     fclose(databasePtr);
 }
@@ -70,7 +70,7 @@ int main(int argc, char *argv[]) {
     newsockfd = accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
     if (newsockfd < 0) error("ERROR on accept");
 
-    int items = 0;
+    int total_amount = 0;
 
     while(1){
         // Read Request
@@ -82,16 +82,28 @@ int main(int argc, char *argv[]) {
         RequestMessage req = decode_request(buffer);
         ResponseMessage resp;
         if(req.Request_type == 0){
-            resp.Response_type = 0;
-            resp.item = 1;
-            items += req.number;
-            strcpy(resp.name, "Hey!");
-            resp.price = 678;
+            int upc_code = req.UPC_CODE;
+            printf("upc: %d\n", upc_code);
+            if(PRICE[upc_code] == -1){
+                // UPC code doesn't exist
+                resp.Response_type = 1;
+                strcpy(resp.error, err2); //err2 in message.h
+            }
+            else{
+                total_amount += PRICE[upc_code] * req.number;
+                resp.Response_type = 0;
+                resp.item = 1;
+                strcpy(resp.name, desc[upc_code]);
+                resp.price = PRICE[upc_code];
+                printf("response: %s %d\n", resp.name, resp.price);
+            }
+            
         }       
         else if(req.Request_type == 1){
+            // Closing Request, return total amount
             resp.Response_type = 0;
             resp.item = 0;
-            resp.total_amount = items;
+            resp.total_amount = total_amount;
         }
 
         // Send Response

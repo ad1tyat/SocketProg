@@ -1,5 +1,5 @@
-10 Apple
-20 banana
-200 Orange
-293 chikoo
-17 dhoni
+10 100 Apple
+20 200 banana
+200 300 Orange
+293 50 chikoo
+17 200 dhoni 

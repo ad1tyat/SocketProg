@@ -74,7 +74,7 @@ int main(int argc, char *argv[])
                 printf("Item: %s, Price: %d\n", resp.name, resp.price);
             }
             else if(req.Request_type == 1){
-                printf("Total Price: %d\n", resp.total_amount);
+                printf("Total Amount: %d\n", resp.total_amount);
             }
         }
         else{
