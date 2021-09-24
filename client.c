@@ -9,6 +9,10 @@
 
 #include "message.h"
 
+#define MIN_UPC_CODE 0
+#define MAX_UPC_CODE 999
+FILE *logger;
+
 void error(const char *msg)
 {
     perror(msg);
@@ -17,6 +21,11 @@ void error(const char *msg)
 
 int main(int argc, char *argv[])
 {
+    logger = fopen("clientlog.log","a+");
+    if(logger == NULL){
+        printf("serverlog.log failed to open.");
+        exit(-1);
+    }
     int sockfd, portno, n;
     struct sockaddr_in serv_addr;
     struct hostent *server;
@@ -45,13 +54,27 @@ int main(int argc, char *argv[])
         error("ERROR connecting");
 
     // The Request Loop
+    printf("Welcome\n");
+    printf("************************\n");
     while(1){
         RequestMessage req;
         printf("Enter Req_Type: ");
         scanf("%d", &(req.Request_type));
         if(req.Request_type == 0){
-            printf("Enter Item Code and Quantity:\n");
-            scanf("%d %d", &req.UPC_CODE, &req.number);
+            int correct = 1;
+            do{
+                printf("Enter Item Code and Quantity:\n");
+                scanf("%d %d", &req.UPC_CODE, &req.number);
+                correct = 1;
+                if(req.UPC_CODE < MIN_UPC_CODE || req.UPC_CODE > MAX_UPC_CODE){
+                    printf("ERROR : Item code must lie between 0 and 999. Please try again.\n");
+                    correct = 0;                
+                }
+                if(req.number <= 0){
+                    printf("ERROR : Quantity must be greater than 0. Please try again.\n");
+                    correct = 0;                
+                }
+            }while(!correct);
         }
         // Make and Send Request
         bzero(buffer,256);
@@ -63,7 +86,7 @@ int main(int argc, char *argv[])
         // Read Response
         bzero(buffer,256);
         n = read(sockfd,buffer,255);
-        printf("Response: %s\n",buffer);
+        fprintf(logger, "Raw Response: %s\n",buffer);
         if (n < 0) 
             error("ERROR reading from socket");
 
@@ -82,8 +105,11 @@ int main(int argc, char *argv[])
             printf("Error: %s\n", resp.error);
         }
         // Closing Request, Break out
+        printf("************************\n");
         if(req.Request_type == 1) break;
     }
+    printf("Thank You For Shopping with us !\n");
     close(sockfd);
+    fclose(logger);
     return 0;
 }

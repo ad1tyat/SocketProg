@@ -11,4 +11,4 @@ client:
 	$(CC) client.c -o client
 
 clean:
-	rm -f server client
+	rm -f server client serverlog.log clientlog.log

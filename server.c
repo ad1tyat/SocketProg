@@ -19,6 +19,7 @@ void error(const char *msg) {
 
 int PRICE[MAXN];
 char desc[MAXN][55];
+FILE *logger;
 
 void populate() {
     FILE *databasePtr;
@@ -36,12 +37,17 @@ void populate() {
     while(fscanf(databasePtr, "%d %d %s\n",&upc, &x, prodDesc) > 0){
         PRICE[upc] = x;
         strcpy(desc[upc], prodDesc);
-        printf("%d %d %s\n", upc, x, prodDesc);
+        fprintf(logger, "Populated : %d %d %s\n", upc, x, prodDesc);
     }
     fclose(databasePtr);
 }
 
 int main(int argc, char *argv[]) {
+    logger = fopen("serverlog.log","a+");
+    if(logger == NULL){
+        printf("serverlog.log failed to open.");
+        exit(-1);
+    }
     populate();
     // Server setup
     int sockfd, newsockfd, portno;
@@ -77,13 +83,13 @@ int main(int argc, char *argv[]) {
         bzero(buffer, 256);
         n = read(newsockfd, buffer, 255);
         if (n < 0) error("ERROR reading from socket");
-        printf("Request: %s\n", buffer);
+        fprintf(logger, "Raw Request: %s\n", buffer);
 
         RequestMessage req = decode_request(buffer);
         ResponseMessage resp;
         if(req.Request_type == 0){
             int upc_code = req.UPC_CODE;
-            printf("upc: %d\n", upc_code);
+            fprintf(logger, "upc: %d\n", upc_code);
             if(PRICE[upc_code] == -1){
                 // UPC code doesn't exist
                 resp.Response_type = 1;
@@ -95,7 +101,7 @@ int main(int argc, char *argv[]) {
                 resp.item = 1;
                 strcpy(resp.name, desc[upc_code]);
                 resp.price = PRICE[upc_code];
-                printf("response: %s %d\n", resp.name, resp.price);
+                fprintf(logger, "response: %s %d\n", resp.name, resp.price);
             }
             
         }       
@@ -115,7 +121,7 @@ int main(int argc, char *argv[]) {
         // If closing request, break out
         if(req.Request_type == 1) break;
     }
-    
+    fclose(logger);
     close(newsockfd);
     close(sockfd);
     return 0;
