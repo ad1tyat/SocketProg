@@ -1,1 +1,6 @@
+# Executables
+server
+client
+
+# Misc
 .vscode/*
