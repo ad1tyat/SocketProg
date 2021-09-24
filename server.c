@@ -37,15 +37,6 @@ void init() {
     fclose(databasePtr);
 }
 
-void decode(char *string){
-
-}
-void encode(Message message){
-	int req_type = message.Request_type;
-	int upc_code = message.UPC_CODE;
-	int number = message.number;
-}
-
 int main(int argc, char *argv[]) {
     init();
     int sockfd, newsockfd, portno;
