@@ -20,25 +20,29 @@ void error(const char *msg) {
 int PRICE[MAXN];
 char *desc[MAXN];
 
-void init() {
+void populate() {
     FILE *databasePtr;
     databasePtr = fopen("database.txt", "r");
     if (databasePtr == NULL) {
         printf("database.txt failed to open.");
         exit(-1);
     }
-    int x;
+    int x, upc;
     char prodDesc[50];
-    for (int i = 0; i < 5; i++) {
-        fscanf(databasePtr, "%d %s\n", &x, prodDesc);
-        PRICE[i] = x;
-        desc[i] = prodDesc;
+    for(int i = 0;i<1000;i++){
+        PRICE[i] = -1;
+        desc[i] = "UPC CODE NOT DEFINED";
+    }
+    while(fscanf(databasePtr, "%d %d %s\n",&upc, &x, prodDesc) > 0){
+        PRICE[upc] = x;
+        desc[upc] = prodDesc;
+        printf("%d %d %s", upc, x, prodDesc);
     }
     fclose(databasePtr);
 }
 
 int main(int argc, char *argv[]) {
-    init();
+    populate();
     // Server setup
     int sockfd, newsockfd, portno;
     socklen_t clilen;
