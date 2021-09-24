@@ -3,9 +3,9 @@
 • UPC-code is a 3-digit unique product code; this field is meaningful only if the Request_Type is 0.
 • Number is the number of items being purchased; this field is meaningful only if the Request_Type is 0.
 */
-struct message
+typedef struct Message
 {
     int Request_type;
     int UPC_CODE;
-    int quantity;
-};
+    int number;
+} Message;

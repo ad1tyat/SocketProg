@@ -1,0 +1,5 @@
+10 Apple
+20 banana
+200 Orange
+293 chikoo
+17 dhoni

@@ -15,8 +15,25 @@ void error(const char *msg)
     exit(0);
 }
 
+void encode(Message message){
+	int req_type = message.Request_type;
+	int upc_code = message.UPC_CODE;
+	int number = message.number;
+    char msg[1000];
+    sprintf(msg, "%d$%d$%d#", req_type, upc_code, number);
+    printf("%s\n",msg);
+}
+void decode(char *msg){
+    
+}
+
 int main(int argc, char *argv[])
 {
+    Message dummy;
+    dummy.Request_type = 5;
+    dummy.number = 69;
+    dummy.UPC_CODE = 420;
+    encode(dummy);
     int sockfd, portno, n;
     struct sockaddr_in serv_addr;
     struct hostent *server;
