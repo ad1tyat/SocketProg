@@ -22,6 +22,8 @@ typedef struct ResponseMessage {
 char err1[] = "Protocol Error";
 char err2[] = "UPC is not found in database";
 
+// TODO: A max message size constant instead of using 256 as magic everywhere (buffer)
+
 void encode_response(ResponseMessage message, char msg[]) {
     int res_type = message.Response_type;
     if (res_type == 1) {
@@ -46,6 +48,7 @@ void encode_response(ResponseMessage message, char msg[]) {
     }
     // printf("Encoded : %s\n", msg);
 }
+
 ResponseMessage decode_response(char response[], int type) {
     int res_type = response[0] - '0';
     ResponseMessage ret;

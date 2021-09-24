@@ -39,10 +39,11 @@ void init() {
 
 int main(int argc, char *argv[]) {
     init();
+    // Server setup
     int sockfd, newsockfd, portno;
     socklen_t clilen;
     char buffer[256];
-    struct sockaddr_in serv_addr, cli_addr;
+    struct sockaddr_in serv_addr;
     int n;
     if (argc < 2) {
         fprintf(stderr, "ERROR, no port provided\n");
@@ -58,15 +59,47 @@ int main(int argc, char *argv[]) {
     if (bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
         error("ERROR on binding");
     listen(sockfd, 5);
+
+    // Accept new Client request
+    struct sockaddr_in cli_addr;
     clilen = sizeof(cli_addr);
     newsockfd = accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
     if (newsockfd < 0) error("ERROR on accept");
-    bzero(buffer, 256);
-    n = read(newsockfd, buffer, 255);
-    if (n < 0) error("ERROR reading from socket");
-    printf("Here is the message: %s\n", buffer);
-    n = write(newsockfd, "I got your message", 18);
-    if (n < 0) error("ERROR writing to socket");
+
+    int items = 0;
+
+    while(1){
+        // Read Request
+        bzero(buffer, 256);
+        n = read(newsockfd, buffer, 255);
+        if (n < 0) error("ERROR reading from socket");
+        printf("Request: %s\n", buffer);
+
+        RequestMessage req = decode_request(buffer);
+        ResponseMessage resp;
+        if(req.Request_type == 0){
+            resp.Response_type = 0;
+            resp.item = 1;
+            items += req.number;
+            strcpy(resp.name, "Hey!");
+            resp.price = 678;
+        }       
+        else if(req.Request_type == 1){
+            resp.Response_type = 0;
+            resp.item = 0;
+            resp.total_amount = items;
+        }
+
+        // Send Response
+        bzero(buffer, 256); 
+        encode_response(resp, buffer);
+        n = write(newsockfd, buffer, strlen(buffer));
+        if (n < 0) error("ERROR writing to socket");
+
+        // If closing request, break out
+        if(req.Request_type == 1) break;
+    }
+    
     close(newsockfd);
     close(sockfd);
     return 0;
