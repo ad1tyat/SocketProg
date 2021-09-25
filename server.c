@@ -1,12 +1,15 @@
 /* A simple server in the internet domain using TCP
    The port number is passed as an argument */
 #include <netinet/in.h>
+#include <signal.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
+
 
 #include "message.h"
 
@@ -17,9 +20,15 @@ void error(const char *msg) {
 
 #define MAXN 1005
 
+// Database Arrays
 int PRICE[MAXN];
 char desc[MAXN][55];
+
+// Log file
 FILE *logger;
+
+// SIGINT indicator
+int sigint_received = 0;
 
 void populate() {
     FILE *databasePtr;
@@ -42,49 +51,21 @@ void populate() {
     fclose(databasePtr);
 }
 
-int main(int argc, char *argv[]) {
-    logger = fopen("serverlog.log","a+");
-    if(logger == NULL){
-        printf("serverlog.log failed to open.");
-        exit(-1);
-    }
-    populate();
-    // Server setup
-    int sockfd, newsockfd, portno;
-    socklen_t clilen;
+void clientHandler(int newsockfd){
     char buffer[256];
-    struct sockaddr_in serv_addr;
-    int n;
-    if (argc < 2) {
-        fprintf(stderr, "ERROR, no port provided\n");
-        exit(1);
-    }
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd < 0) error("ERROR opening socket");
-    bzero((char *)&serv_addr, sizeof(serv_addr));
-    portno = atoi(argv[1]);
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = INADDR_ANY;
-    serv_addr.sin_port = htons(portno);
-    if (bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
-        error("ERROR on binding");
-    listen(sockfd, 5);
-
-    // Accept new Client request
-    struct sockaddr_in cli_addr;
-    clilen = sizeof(cli_addr);
-    newsockfd = accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
-    if (newsockfd < 0) error("ERROR on accept");
-
     int total_amount = 0;
+    int n;
 
-    while(1){
+    while(!sigint_received){
         // Read Request
         bzero(buffer, 256);
         n = read(newsockfd, buffer, 255);
-        if (n < 0) error("ERROR reading from socket");
+        if (n < 0) {
+            if(errno == EINTR) continue;
+            error("ERROR reading from socket");
+        }
         fprintf(logger, "Raw Request: %s\n", buffer);
-
+        
         RequestMessage req = decode_request(buffer);
         ResponseMessage resp;
         if(req.Request_type == 0){
@@ -121,8 +102,71 @@ int main(int argc, char *argv[]) {
         // If closing request, break out
         if(req.Request_type == 1) break;
     }
+    
+}
+
+void sigint_handler(int signum){
+    sigint_received = 1;
+}
+
+int main(int argc, char *argv[]) {
+    struct sigaction new_action;
+    new_action.sa_handler = sigint_handler;
+    sigemptyset(&new_action.sa_mask);
+    new_action.sa_flags = 0;
+    sigaction(SIGINT, &new_action, NULL);
+
+    logger = fopen("serverlog.log","a+");
+    if(logger == NULL){
+        printf("serverlog.log failed to open.");
+        exit(-1);
+    }
+    populate();
+
+    // Server setup
+    int sockfd, newsockfd, portno;
+    socklen_t clilen;
+    struct sockaddr_in serv_addr, cli_addr;
+    int n;
+    if (argc < 2) {
+        fprintf(stderr, "ERROR, no port provided\n");
+        exit(1);
+    }
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0) error("ERROR opening socket");
+    bzero((char *)&serv_addr, sizeof(serv_addr));
+    portno = atoi(argv[1]);
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_addr.s_addr = INADDR_ANY;
+    serv_addr.sin_port = htons(portno);
+    if (bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
+        error("ERROR on binding");
+    listen(sockfd, 5);
+
+    // Accept new Client request
+    while(!sigint_received){
+        clilen = sizeof(cli_addr);
+        newsockfd = accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
+        if (newsockfd < 0){
+            if(errno == EINTR){
+                // system call was interrupted
+                continue;
+            }
+            // Accept Error
+            printf("Error accepting connection\n");
+        }
+        else{
+            int childpid = fork();
+            if(childpid == 0){
+                close(sockfd);
+                clientHandler(newsockfd);
+                close(newsockfd);
+                exit(0);
+            }
+        }
+    }
+    // Cleanup
     fclose(logger);
-    close(newsockfd);
     close(sockfd);
     return 0;
 }
