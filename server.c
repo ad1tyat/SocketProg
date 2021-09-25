@@ -8,6 +8,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 
@@ -109,13 +110,27 @@ void sigint_handler(int signum){
     sigint_received = 1;
 }
 
+void sigchld_handler(int signum){
+    pid_t child_pid;
+    int stat;
+    child_pid = wait(&stat);
+    return;
+}
+
 int main(int argc, char *argv[]) {
+    // Registering Signal Handlers
     struct sigaction new_action;
     new_action.sa_handler = sigint_handler;
     sigemptyset(&new_action.sa_mask);
     new_action.sa_flags = 0;
     sigaction(SIGINT, &new_action, NULL);
 
+    new_action.sa_handler = sigchld_handler;
+    sigemptyset(&new_action.sa_mask);
+    new_action.sa_flags = 0;
+    sigaction(SIGCHLD, &new_action, NULL);
+
+    // Logging
     logger = fopen("serverlog.log","a+");
     if(logger == NULL){
         printf("serverlog.log failed to open.");
