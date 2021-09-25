@@ -86,10 +86,13 @@ int main(int argc, char *argv[])
         // Read Response
         bzero(buffer,256);
         n = read(sockfd,buffer,255);
-        fprintf(logger, "Raw Response: %s\n",buffer);
         if (n < 0) 
             error("ERROR reading from socket");
-
+        else if(n == 0){
+            error("Client: The connection was ended prematurely");
+        }
+        fprintf(logger, "Raw Response: %s\n",buffer);
+        
         ResponseMessage resp = decode_response(buffer, req.Request_type);
         if(resp.Response_type == 0){
             // Status OK
