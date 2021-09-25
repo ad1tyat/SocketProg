@@ -11,27 +11,43 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-
 #include "message.h"
+
+#define MAXN 1005
+FILE *logger;
 
 void error(const char *msg) {
     perror(msg);
     exit(1);
 }
 
-#define MAXN 1005
+// Signal handling
+int sigint_received = 0;
 
-// Database Arrays
+void sigint_handler(int signum){
+    sigint_received = 1;
+}
+
+void sigchld_handler(int signum){
+    pid_t child_pid;
+    int stat;
+    child_pid = wait(&stat);
+    return;
+}
+
+void register_signal_handler(int signum, void (*handler)(int)){
+    struct sigaction new_action;
+    new_action.sa_handler = handler;
+    sigemptyset(&new_action.sa_mask);
+    new_action.sa_flags = 0;
+    sigaction(signum, &new_action, NULL);
+}
+
+// Database
 int PRICE[MAXN];
 char desc[MAXN][55];
 
-// Log file
-FILE *logger;
-
-// SIGINT indicator
-int sigint_received = 0;
-
-void populate() {
+void populate_database() {
     FILE *databasePtr;
     databasePtr = fopen("database.txt", "r");
     if (databasePtr == NULL) {
@@ -52,7 +68,74 @@ void populate() {
     fclose(databasePtr);
 }
 
-void clientHandler(int newsockfd){
+void bind_server(int sockfd, int portno){
+    struct sockaddr_in serv_addr;
+    bzero((char *)&serv_addr, sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_addr.s_addr = INADDR_ANY;
+    serv_addr.sin_port = htons(portno);
+    if (bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
+        error("ERROR on binding");
+}
+
+// Client Connection Handler
+void client_handler(int newsockfd);
+
+int main(int argc, char *argv[]) {
+    // Logging
+    logger = fopen("serverlog.log","a+");
+    if(logger == NULL){
+        printf("serverlog.log failed to open.");
+        exit(-1);
+    }
+    // Signal Handling
+    register_signal_handler(SIGINT, sigint_handler);
+    register_signal_handler(SIGCHLD, sigchld_handler);
+    // Server Setup
+    int sockfd, portno;
+    if (argc < 2) {
+        fprintf(stderr, "ERROR, no port provided\n");
+        exit(1);
+    }
+    portno = atoi(argv[1]);
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0) error("ERROR opening socket");
+    bind_server(sockfd, portno);
+    populate_database();
+    listen(sockfd, 5);
+
+    // Request Handling Loop
+    struct sockaddr_in cli_addr;
+    int newsockfd;
+    socklen_t clilen;
+    while(!sigint_received){
+        clilen = sizeof(cli_addr);
+        newsockfd = accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
+        if (newsockfd < 0){
+            // An interrupt had occured
+            if(errno == EINTR) continue;
+            // Otherwise, an Error has occurred
+            printf("Error accepting connection\n");
+        }
+        else{
+            // Fork a child to handle the connection
+            int childpid = fork();
+            if(childpid == 0){
+                close(sockfd);
+                client_handler(newsockfd);
+                close(newsockfd);
+                exit(0);
+            }
+        }
+    }
+
+    // End Server
+    fclose(logger);
+    close(sockfd);
+    return 0;
+}
+
+void client_handler(int newsockfd){
     char buffer[256];
     int total_amount = 0;
     int n;
@@ -102,86 +185,5 @@ void clientHandler(int newsockfd){
 
         // If closing request, break out
         if(req.Request_type == 1) break;
-    }
-    
-}
-
-void sigint_handler(int signum){
-    sigint_received = 1;
-}
-
-void sigchld_handler(int signum){
-    pid_t child_pid;
-    int stat;
-    child_pid = wait(&stat);
-    return;
-}
-
-int main(int argc, char *argv[]) {
-    // Registering Signal Handlers
-    struct sigaction new_action;
-    new_action.sa_handler = sigint_handler;
-    sigemptyset(&new_action.sa_mask);
-    new_action.sa_flags = 0;
-    sigaction(SIGINT, &new_action, NULL);
-
-    new_action.sa_handler = sigchld_handler;
-    sigemptyset(&new_action.sa_mask);
-    new_action.sa_flags = 0;
-    sigaction(SIGCHLD, &new_action, NULL);
-
-    // Logging
-    logger = fopen("serverlog.log","a+");
-    if(logger == NULL){
-        printf("serverlog.log failed to open.");
-        exit(-1);
-    }
-    populate();
-
-    // Server setup
-    int sockfd, newsockfd, portno;
-    socklen_t clilen;
-    struct sockaddr_in serv_addr, cli_addr;
-    int n;
-    if (argc < 2) {
-        fprintf(stderr, "ERROR, no port provided\n");
-        exit(1);
-    }
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd < 0) error("ERROR opening socket");
-    bzero((char *)&serv_addr, sizeof(serv_addr));
-    portno = atoi(argv[1]);
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = INADDR_ANY;
-    serv_addr.sin_port = htons(portno);
-    if (bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
-        error("ERROR on binding");
-    listen(sockfd, 5);
-
-    // Accept new Client request
-    while(!sigint_received){
-        clilen = sizeof(cli_addr);
-        newsockfd = accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
-        if (newsockfd < 0){
-            if(errno == EINTR){
-                // system call was interrupted
-                continue;
-            }
-            // Accept Error
-            printf("Error accepting connection\n");
-        }
-        else{
-            int childpid = fork();
-            if(childpid == 0){
-                close(sockfd);
-                clientHandler(newsockfd);
-                close(newsockfd);
-                exit(0);
-            }
-        }
-    }
-    // Cleanup
-    fclose(logger);
-    close(sockfd);
-    return 0;
+    }   
 }

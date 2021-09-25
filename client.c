@@ -19,18 +19,27 @@ void error(const char *msg)
     exit(0);
 }
 
-int main(int argc, char *argv[])
-{
+void connect_to_server(struct hostent *server, int sockfd, int portno){
+    struct sockaddr_in serv_addr;
+    bzero((char *) &serv_addr, sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+    bcopy((char *)server->h_addr, 
+         (char *)&serv_addr.sin_addr.s_addr,
+         server->h_length);
+    serv_addr.sin_port = htons(portno);
+    if (connect(sockfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0) 
+        error("ERROR connecting");
+}
+
+int main(int argc, char *argv[]){
     logger = fopen("clientlog.log","a+");
     if(logger == NULL){
         printf("serverlog.log failed to open.");
         exit(-1);
     }
-    int sockfd, portno, n;
-    struct sockaddr_in serv_addr;
-    struct hostent *server;
 
-    char buffer[256];
+    int sockfd, portno, n;
+    struct hostent *server;
     if (argc < 3) {
        fprintf(stderr,"usage %s hostname port\n", argv[0]);
        exit(0);
@@ -44,16 +53,10 @@ int main(int argc, char *argv[])
         fprintf(stderr,"ERROR, no such host\n");
         exit(0);
     }
-    bzero((char *) &serv_addr, sizeof(serv_addr));
-    serv_addr.sin_family = AF_INET;
-    bcopy((char *)server->h_addr, 
-         (char *)&serv_addr.sin_addr.s_addr,
-         server->h_length);
-    serv_addr.sin_port = htons(portno);
-    if (connect(sockfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0) 
-        error("ERROR connecting");
-
+    connect_to_server(server, sockfd, portno);
+    
     // The Request Loop
+    char buffer[256];
     printf("Welcome\n");
     printf("************************\n");
     while(1){
@@ -107,8 +110,8 @@ int main(int argc, char *argv[])
             // ERROR
             printf("Error: %s\n", resp.error);
         }
-        // Closing Request, Break out
         printf("************************\n");
+        // Closing Request, Break out
         if(req.Request_type == 1) break;
     }
     printf("Thank You For Shopping with us !\n");
