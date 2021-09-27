@@ -16,7 +16,7 @@
 #define MAXN 1005
 FILE *logger;
 
-void error(const char *msg) {
+void error_exit_sys(const char *msg){
     perror(msg);
     exit(1);
 }
@@ -51,8 +51,8 @@ void populate_database() {
     FILE *databasePtr;
     databasePtr = fopen("database.txt", "r");
     if (databasePtr == NULL) {
-        printf("database.txt failed to open.");
-        exit(-1);
+        fprintf(stderr, "populate_database: Failed to read database file. Please check 'database.txt' exists");
+        exit(1);
     }
     int x, upc;
     char prodDesc[50];
@@ -75,7 +75,7 @@ void bind_server(int sockfd, int portno){
     serv_addr.sin_addr.s_addr = INADDR_ANY;
     serv_addr.sin_port = htons(portno);
     if (bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
-        error("ERROR on binding");
+        error_exit_sys("ERROR in socket binding\n");
 }
 
 // Client Connection Handler
@@ -85,8 +85,8 @@ int main(int argc, char *argv[]) {
     // Logging
     logger = fopen("serverlog.log","a+");
     if(logger == NULL){
-        printf("serverlog.log failed to open.");
-        exit(-1);
+        fprintf(stderr, "ERROR, Failed to create serverlog.log.");
+        exit(1);
     }
     // Signal Handling
     register_signal_handler(SIGINT, sigint_handler);
@@ -99,7 +99,9 @@ int main(int argc, char *argv[]) {
     }
     portno = atoi(argv[1]);
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd < 0) error("ERROR opening socket");
+    if (sockfd < 0) {
+        error_exit_sys("ERROR in opening socket\n");
+    }
     bind_server(sockfd, portno);
     populate_database();
     listen(sockfd, 5);
@@ -115,7 +117,7 @@ int main(int argc, char *argv[]) {
             // An interrupt had occured
             if(errno == EINTR) continue;
             // Otherwise, an Error has occurred
-            printf("Error accepting connection\n");
+            perror("ERROR in accepting connection\n");
         }
         else{
             // Fork a child to handle the connection
@@ -136,17 +138,17 @@ int main(int argc, char *argv[]) {
 }
 
 void client_handler(int newsockfd){
-    char buffer[256];
+    char buffer[MAX_MESSAGE_SIZE + 1];
     int total_amount = 0;
     int n;
 
     while(!sigint_received){
         // Read Request
-        bzero(buffer, 256);
-        n = read(newsockfd, buffer, 255);
+        bzero(buffer, sizeof buffer);
+        n = read(newsockfd, buffer, MAX_MESSAGE_SIZE);
         if (n < 0) {
             if(errno == EINTR) continue;
-            error("ERROR reading from socket");
+            error_exit_sys("ERROR in reading from socket\n");
         }
         fprintf(logger, "Raw Request: %s\n", buffer);
         
@@ -178,10 +180,12 @@ void client_handler(int newsockfd){
         }
 
         // Send Response
-        bzero(buffer, 256); 
+        bzero(buffer, sizeof buffer); 
         encode_response(resp, buffer);
         n = write(newsockfd, buffer, strlen(buffer));
-        if (n < 0) error("ERROR writing to socket");
+        if (n < 0) {
+            error_exit_sys("write: Error writing to socket\n");
+        }
 
         // If closing request, break out
         if(req.Request_type == 1) break;

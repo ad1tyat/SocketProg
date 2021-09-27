@@ -19,10 +19,10 @@ typedef struct ResponseMessage {
     char name[50];
 } ResponseMessage;
 
-char err1[] = "Protocol Error";
-char err2[] = "UPC is not found in database";
+const char err1[] = "Protocol Error";
+const char err2[] = "UPC is not found in database";
 
-// TODO: A max message size constant instead of using 256 as magic everywhere (buffer)
+#define MAX_MESSAGE_SIZE 255
 
 void encode_response(ResponseMessage message, char msg[]) {
     int res_type = message.Response_type;

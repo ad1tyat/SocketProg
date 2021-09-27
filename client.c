@@ -13,7 +13,7 @@
 #define MAX_UPC_CODE 999
 FILE *logger;
 
-void error(const char *msg)
+void error_exit_sys(const char *msg)
 {
     perror(msg);
     exit(0);
@@ -28,14 +28,14 @@ void connect_to_server(struct hostent *server, int sockfd, int portno){
          server->h_length);
     serv_addr.sin_port = htons(portno);
     if (connect(sockfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0) 
-        error("ERROR connecting");
+        error_exit_sys("ERROR in connecting to server\n");
 }
 
 int main(int argc, char *argv[]){
     logger = fopen("clientlog.log","a+");
     if(logger == NULL){
-        printf("serverlog.log failed to open.");
-        exit(-1);
+        fprintf(stderr, "Failed to open clientlog.log");
+        exit(1);
     }
 
     int sockfd, portno, n;
@@ -47,7 +47,7 @@ int main(int argc, char *argv[]){
     portno = atoi(argv[2]);
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) 
-        error("ERROR opening socket");
+        error_exit_sys("ERROR opening socket\n");
     server = gethostbyname(argv[1]);
     if (server == NULL) {
         fprintf(stderr,"ERROR, no such host\n");
@@ -56,12 +56,12 @@ int main(int argc, char *argv[]){
     connect_to_server(server, sockfd, portno);
     
     // The Request Loop
-    char buffer[256];
+    char buffer[MAX_MESSAGE_SIZE + 1];
     printf("Welcome\n");
     printf("************************\n");
     while(1){
         RequestMessage req;
-        printf("Enter Req_Type: ");
+        printf("Enter Req_Type (0: Order, 1: Finish): ");
         scanf("%d", &(req.Request_type));
         if(req.Request_type == 0){
             int correct = 1;
@@ -70,29 +70,30 @@ int main(int argc, char *argv[]){
                 scanf("%d %d", &req.UPC_CODE, &req.number);
                 correct = 1;
                 if(req.UPC_CODE < MIN_UPC_CODE || req.UPC_CODE > MAX_UPC_CODE){
-                    printf("ERROR : Item code must lie between 0 and 999. Please try again.\n");
+                    printf("Invalid: Item code must lie between 0 and 999. Please try again.\n");
                     correct = 0;                
                 }
                 if(req.number <= 0){
-                    printf("ERROR : Quantity must be greater than 0. Please try again.\n");
+                    printf("Invalid: Quantity must be greater than 0. Please try again.\n");
                     correct = 0;                
                 }
             }while(!correct);
         }
         // Make and Send Request
-        bzero(buffer,256);
+        bzero(buffer, sizeof buffer);
         encode_request(req, buffer);
-        n = write(sockfd,buffer,strlen(buffer));
+        n = write(sockfd, buffer, strlen(buffer));
         if (n < 0) 
-            error("ERROR writing to socket");
+            error_exit_sys("ERROR writing to socket\n");
         
         // Read Response
-        bzero(buffer,256);
-        n = read(sockfd,buffer,255);
+        bzero(buffer, sizeof buffer);
+        n = read(sockfd, buffer, MAX_MESSAGE_SIZE);
         if (n < 0) 
-            error("ERROR reading from socket");
+            error_exit_sys("ERROR reading from socket\n");
         else if(n == 0){
-            error("Client: The connection was ended prematurely");
+            fprintf(stderr, "ERROR: The connection was terminated prematurely\n");
+            exit(0);
         }
         fprintf(logger, "Raw Response: %s\n",buffer);
         
