@@ -65,6 +65,7 @@ void populate_database() {
         strcpy(desc[upc], prodDesc);
         fprintf(logger, "Populated : %d %d %s\n", upc, x, prodDesc);
     }
+    fflush(logger);
     fclose(databasePtr);
 }
 
@@ -124,7 +125,9 @@ int main(int argc, char *argv[]) {
             int childpid = fork();
             if(childpid == 0){
                 close(sockfd);
+                printf("New Client Connected!\n");
                 client_handler(newsockfd);
+                printf("A client disconnected!\n");
                 close(newsockfd);
                 exit(0);
             }
