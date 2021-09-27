@@ -1,5 +1,7 @@
-10 100 Apple
-20 200 banana
-200 300 Orange
-293 50 chikoo
-17 200 dhoni 
+010 100 Apple
+200 200 Banana
+250 300 Orange
+300 50 Chocolate
+350 2000 Toy  
+400 1000 Bread
+900 800 MacBook
