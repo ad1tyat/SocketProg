@@ -92,7 +92,7 @@ int main(int argc, char *argv[]){
         if (n < 0) 
             error_exit_sys("ERROR reading from socket\n");
         else if(n == 0){
-            fprintf(stderr, "ERROR: The connection was terminated prematurely\n");
+            fprintf(stderr, "ERROR: Server closed connection prematurely\n");
             exit(0);
         }
         fprintf(logger, "Raw Response: %s\n",buffer);
